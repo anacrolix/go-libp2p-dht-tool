@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	peer "github.com/libp2p/go-libp2p-peer"
+
 	"github.com/peterh/liner"
 
 	multiaddr "github.com/multiformats/go-multiaddr"
@@ -57,6 +59,7 @@ const (
 	setClientMode         = "set_client_mode"
 	bootstrapSelf         = "bootstrap_self"
 	bootstrapRandom       = "bootstrap_random"
+	ping                  = "ping"
 )
 
 var allCommands = []string{
@@ -68,6 +71,7 @@ var allCommands = []string{
 	setClientMode,
 	bootstrapSelf,
 	bootstrapRandom,
+	ping,
 }
 
 func interactiveLoop(d *dht.IpfsDHT, h host.Host) error {
@@ -96,7 +100,8 @@ func interactiveLoop(d *dht.IpfsDHT, h host.Host) error {
 	}
 }
 
-func handleInput(input string, d *dht.IpfsDHT, h host.Host) bool {
+func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
+	inputFields := strings.Fields(input)
 	intChan := make(chan os.Signal, 1)
 	signal.Notify(intChan, os.Interrupt)
 	defer signal.Stop(intChan)
@@ -109,7 +114,7 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) bool {
 		case <-ctx.Done():
 		}
 	}()
-	switch input {
+	switch inputFields[0] {
 	case connectBootstrapNodes:
 		bootstrapNodeAddrs := dht.DefaultBootstrapPeers
 		numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
@@ -137,6 +142,13 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) bool {
 		log.Printf("%s (%x)", d.PeerId().Pretty(), d.PeerKey())
 	case setClientMode:
 		d.SetClientMode()
+	case ping:
+		id, err := peer.IDB58Decode(inputFields[1])
+		if err != nil {
+			log.Printf("can't parse peer id: %v", err)
+			return true
+		}
+		log.Printf("ping result: %v", d.Ping(ctx, id))
 	default:
 		log.Printf("unknown command: %q", input)
 		return false
