@@ -114,6 +114,9 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 		case <-ctx.Done():
 		}
 	}()
+	if len(inputFields) == 0 {
+		return false
+	}
 	switch inputFields[0] {
 	case connectBootstrapNodes:
 		bootstrapNodeAddrs := dht.DefaultBootstrapPeers
