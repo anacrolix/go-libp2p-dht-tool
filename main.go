@@ -150,7 +150,7 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 	case printRoutingTable:
 		d.RoutingTable().Print()
 	case printSelfId:
-		log.Printf("%s (%x)", d.PeerID().Pretty(), d.PeerKey())
+		fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
 	//case setClientMode:
 	//	d.SetClientMode()
 	case ping:
