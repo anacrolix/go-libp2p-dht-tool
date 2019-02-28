@@ -11,6 +11,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
+
+	"github.com/anacrolix/tagflag"
+
 	peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/peterh/liner"
@@ -37,12 +41,16 @@ func errMain() error {
 	ipfslog.SetAllLoggerLevels(ipfslog.Warning)
 	ipfslog.SetModuleLevel("dht", ipfslog.Info)
 	log.SetFlags(log.Flags() | log.Llongfile)
+	var cmd struct {
+		Passive bool `help:"start DHT node in client-only mode"`
+	}
+	tagflag.Parse(&cmd)
 	host, err := libp2p.New(context.Background())
 	if err != nil {
 		return fmt.Errorf("error creating host: %s", err)
 	}
 	defer host.Close()
-	d, err := dht.New(context.Background(), host)
+	d, err := dht.New(context.Background(), host, dhtopts.Client(cmd.Passive))
 	if err != nil {
 		return fmt.Errorf("error creating dht node: %s", err)
 	}
@@ -142,9 +150,9 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 	case printRoutingTable:
 		d.RoutingTable().Print()
 	case printSelfId:
-		log.Printf("%s (%x)", d.PeerId().Pretty(), d.PeerKey())
-	case setClientMode:
-		d.SetClientMode()
+		log.Printf("%s (%x)", d.PeerID().Pretty(), d.PeerKey())
+	//case setClientMode:
+	//	d.SetClientMode()
 	case ping:
 		id, err := peer.IDB58Decode(inputFields[1])
 		if err != nil {
