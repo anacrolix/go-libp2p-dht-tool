@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 
@@ -61,6 +62,7 @@ func errMain() error {
 }
 
 const (
+	addBootstrapNodes     = "add_bootstrap_nodes"
 	connectBootstrapNodes = "connect_bootstrap_nodes"
 	bootstrapOnce         = "bootstrap_once"
 	selectIndefinitely    = "select_indefinitely"
@@ -73,6 +75,7 @@ const (
 )
 
 var allCommands = []string{
+	addBootstrapNodes,
 	connectBootstrapNodes,
 	bootstrapOnce,
 	selectIndefinitely,
@@ -128,6 +131,17 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 		return false
 	}
 	switch inputFields[0] {
+	case addBootstrapNodes:
+		for _, bna := range dht.DefaultBootstrapPeers {
+			addr, last := multiaddr.SplitLast(bna)
+			p, err := peer.IDB58Decode(last.Value())
+			if err != nil {
+				log.Printf("can't decode %q: %v", last, err)
+				continue
+			}
+			d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
+			d.RoutingTable().Update(p)
+		}
 	case connectBootstrapNodes:
 		bootstrapNodeAddrs := dht.DefaultBootstrapPeers
 		numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
