@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
+
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 
 	"github.com/anacrolix/tagflag"
@@ -148,7 +150,7 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 	case selectIndefinitely:
 		<-ctx.Done()
 	case printRoutingTable:
-		d.RoutingTable().Print()
+		doPrintRoutingTable(os.Stdout, d)
 	case printSelfId:
 		fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
 	//case setClientMode:
@@ -165,6 +167,20 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 		return false
 	}
 	return true
+}
+
+func doPrintRoutingTable(w io.Writer, d *dht.IpfsDHT) {
+	for i, b := range d.RoutingTable().Buckets {
+		for _, p := range b.Peers() {
+			fmt.Fprintf(w, "%3d %3d %x %v %v\n",
+				i,
+				kbucket.CommonPrefixLen(kbucket.ConvertPeerID(p), kbucket.ConvertPeerID(d.PeerID())),
+				kbucket.ConvertPeerID(p),
+				p.Pretty(),
+				d.Host().Network().Connectedness(p),
+			)
+		}
+	}
 }
 
 func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.Multiaddr) (numConnected int32) {
