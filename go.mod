@@ -6,6 +6,7 @@ require (
 	github.com/anacrolix/tagflag v0.0.0-20180803105420-3a8ff5428f76
 	github.com/bradfitz/iter v0.0.0-20190303215204-33e6a9893b0c // indirect
 	github.com/huandu/xstrings v1.2.0 // indirect
+	github.com/ipfs/go-cid v0.0.1
 	github.com/libp2p/go-libp2p v0.0.1
 	github.com/libp2p/go-libp2p-host v0.0.1
 	github.com/libp2p/go-libp2p-kad-dht v0.0.0-20190303230814-deeac6790c16

@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	cid "github.com/ipfs/go-cid"
 
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 
@@ -144,6 +148,26 @@ var allCommands = map[string]commandHandler{
 			return false
 		}
 		fmt.Fprintf(commandOutputWriter, "ping result: %v", d.Ping(ctx, id))
+		return true
+	}),
+	"find_providers": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+		key, err := cid.Decode(args[0])
+		if err != nil {
+			fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[1], err)
+			return true
+		}
+		count := math.MaxInt32
+		if len(args) >= 2 {
+			count64, err := strconv.ParseInt(args[1], 0, 0)
+			if err != nil {
+				fmt.Fprintf(commandOutputWriter, "error parsing count: %v\n", err)
+				return true
+			}
+			count = int(count64)
+		}
+		for pi := range d.FindProvidersAsync(ctx, key, count) {
+			fmt.Fprint(commandOutputWriter, pi)
+		}
 		return true
 	}),
 }
