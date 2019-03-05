@@ -137,7 +137,7 @@ var allCommands = map[string]commandHandler{
 		return true
 	}),
 	"ping": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
-		id, err := peer.IDB58Decode(args[1])
+		id, err := peer.IDB58Decode(args[0])
 		if err != nil {
 			log.Printf("can't parse peer id: %v", err)
 			return false
