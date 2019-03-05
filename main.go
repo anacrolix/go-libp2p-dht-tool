@@ -15,27 +15,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	cid "github.com/ipfs/go-cid"
-
-	kbucket "github.com/libp2p/go-libp2p-kbucket"
-
-	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-
-	"github.com/anacrolix/tagflag"
-
-	peer "github.com/libp2p/go-libp2p-peer"
-
-	"github.com/peterh/liner"
-
-	multiaddr "github.com/multiformats/go-multiaddr"
-
-	host "github.com/libp2p/go-libp2p-host"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
-
 	"github.com/anacrolix/ipfslog"
-
+	"github.com/anacrolix/tagflag"
+	cid "github.com/ipfs/go-cid"
 	libp2p "github.com/libp2p/go-libp2p"
+	host "github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
+	peer "github.com/libp2p/go-libp2p-peer"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/peterh/liner"
 )
 
 func main() {
