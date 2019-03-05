@@ -61,37 +61,97 @@ func errMain() error {
 	return interactiveLoop(d, host)
 }
 
-const (
-	addBootstrapNodes     = "add_bootstrap_nodes"
-	connectBootstrapNodes = "connect_bootstrap_nodes"
-	bootstrapOnce         = "bootstrap_once"
-	selectIndefinitely    = "select_indefinitely"
-	printRoutingTable     = "print_routing_table"
-	printSelfId           = "print_self_id"
-	setClientMode         = "set_client_mode"
-	bootstrapSelf         = "bootstrap_self"
-	bootstrapRandom       = "bootstrap_random"
-	ping                  = "ping"
-)
+type commandHandler interface {
+	Do(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+}
 
-var allCommands = []string{
-	addBootstrapNodes,
-	connectBootstrapNodes,
-	bootstrapOnce,
-	selectIndefinitely,
-	printRoutingTable,
-	printSelfId,
-	setClientMode,
-	bootstrapSelf,
-	bootstrapRandom,
-	ping,
+type commandFunc func(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+
+func (me commandFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+	return me(ctx, d, h, args)
+}
+
+type nullaryFunc func(context.Context, *dht.IpfsDHT, host.Host) bool
+
+func (me nullaryFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+	if len(args) > 0 {
+		log.Print("command does not take arguments")
+		return false
+	}
+	return me(ctx, d, h)
+}
+
+var commandOutputWriter = os.Stdout
+
+var allCommands = map[string]commandHandler{
+	"add_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		for _, bna := range dht.DefaultBootstrapPeers {
+			addr, last := multiaddr.SplitLast(bna)
+			p, err := peer.IDB58Decode(last.Value())
+			if err != nil {
+				log.Printf("can't decode %q: %v", last, err)
+				continue
+			}
+			d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
+			d.RoutingTable().Update(p)
+		}
+		return true
+	}),
+	"connect_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		bootstrapNodeAddrs := dht.DefaultBootstrapPeers
+		numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
+		if numConnected == 0 {
+			log.Print("failed to connect to any bootstrap nodes")
+		} else {
+			log.Printf("connected to %d/%d bootstrap nodes", numConnected, len(bootstrapNodeAddrs))
+		}
+		return true
+	}),
+	"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		cfg := dht.DefaultBootstrapConfig
+		//cfg.Timeout = time.Minute
+		err := d.BootstrapOnce(ctx, cfg)
+		if err != nil {
+			log.Printf("error bootstrapping: %v", err)
+		}
+		return true
+	}),
+	"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		<-ctx.Done()
+		return true
+	}),
+	"print_routing_table": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		doPrintRoutingTable(os.Stdout, d)
+		return true
+	}),
+	"print_self_id": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
+		return true
+	}),
+	"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		log.Print(d.BootstrapSelf(ctx))
+		return true
+	}),
+	"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		fmt.Fprint(commandOutputWriter, d.BootstrapRandom(ctx))
+		return true
+	}),
+	"ping": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+		id, err := peer.IDB58Decode(args[1])
+		if err != nil {
+			log.Printf("can't parse peer id: %v", err)
+			return false
+		}
+		fmt.Fprintf(commandOutputWriter, "ping result: %v", d.Ping(ctx, id))
+		return true
+	}),
 }
 
 func interactiveLoop(d *dht.IpfsDHT, h host.Host) error {
 	s := liner.NewLiner()
 	s.SetTabCompletionStyle(liner.TabPrints)
 	s.SetCompleter(func(line string) (ret []string) {
-		for _, c := range allCommands {
+		for c := range allCommands {
 			if strings.HasPrefix(c, line) {
 				ret = append(ret, c)
 			}
@@ -130,57 +190,11 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 	if len(inputFields) == 0 {
 		return false
 	}
-	switch inputFields[0] {
-	case addBootstrapNodes:
-		for _, bna := range dht.DefaultBootstrapPeers {
-			addr, last := multiaddr.SplitLast(bna)
-			p, err := peer.IDB58Decode(last.Value())
-			if err != nil {
-				log.Printf("can't decode %q: %v", last, err)
-				continue
-			}
-			d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
-			d.RoutingTable().Update(p)
-		}
-	case connectBootstrapNodes:
-		bootstrapNodeAddrs := dht.DefaultBootstrapPeers
-		numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
-		if numConnected == 0 {
-			log.Print("failed to connect to any bootstrap nodes")
-		} else {
-			log.Printf("connected to %d/%d bootstrap nodes", numConnected, len(bootstrapNodeAddrs))
-		}
-	case bootstrapOnce:
-		cfg := dht.DefaultBootstrapConfig
-		//cfg.Timeout = time.Minute
-		err := d.BootstrapOnce(ctx, cfg)
-		if err != nil {
-			log.Printf("error bootstrapping: %v", err)
-		}
-	case bootstrapSelf:
-		log.Print(d.BootstrapSelf(ctx))
-	case bootstrapRandom:
-		log.Print(d.BootstrapRandom(ctx))
-	case selectIndefinitely:
-		<-ctx.Done()
-	case printRoutingTable:
-		doPrintRoutingTable(os.Stdout, d)
-	case printSelfId:
-		fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
-	//case setClientMode:
-	//	d.SetClientMode()
-	case ping:
-		id, err := peer.IDB58Decode(inputFields[1])
-		if err != nil {
-			log.Printf("can't parse peer id: %v", err)
-			return true
-		}
-		log.Printf("ping result: %v", d.Ping(ctx, id))
-	default:
-		log.Printf("unknown command: %q", input)
-		return false
+	if handler, ok := allCommands[inputFields[0]]; ok {
+		return handler.Do(ctx, d, h, inputFields[1:])
 	}
-	return true
+	fmt.Fprintf(commandOutputWriter, "unknown command: %q", input)
+	return false
 }
 
 func doPrintRoutingTable(w io.Writer, d *dht.IpfsDHT) {
