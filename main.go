@@ -163,8 +163,34 @@ var allCommands = map[string]commandHandler{
 	}),
 }
 
+const historyPath = ".libp2p-dht-tool-history"
+
+func readHistory(s *liner.State) (int, error) {
+	f, err := os.Open(historyPath)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	return s.ReadHistory(f)
+}
+
+func writeHistory(s *liner.State) (int, error) {
+	f, err := os.OpenFile(historyPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	num, err := s.WriteHistory(f)
+	if err != nil {
+		return num, err
+	}
+	return num, f.Close()
+}
+
 func interactiveLoop(d *dht.IpfsDHT, h host.Host) error {
 	s := liner.NewLiner()
+	readHistory(s)
+	defer writeHistory(s)
 	s.SetTabCompletionStyle(liner.TabPrints)
 	s.SetCompleter(func(line string) (ret []string) {
 		for c := range allCommands {
