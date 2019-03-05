@@ -18,6 +18,7 @@ import (
 	"github.com/anacrolix/ipfslog"
 	"github.com/anacrolix/tagflag"
 	cid "github.com/ipfs/go-cid"
+	ipfs_go_log "github.com/ipfs/go-log"
 	libp2p "github.com/libp2p/go-libp2p"
 	host "github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -158,6 +159,13 @@ var allCommands = map[string]commandHandler{
 		}
 		for pi := range d.FindProvidersAsync(ctx, key, count) {
 			fmt.Fprint(commandOutputWriter, pi)
+		}
+		return true
+	}),
+	"set_ipfs_log_level": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+		err := ipfs_go_log.SetLogLevel(args[0], args[1])
+		if err != nil {
+			fmt.Fprintln(commandOutputWriter, err)
 		}
 		return true
 	}),
