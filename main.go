@@ -116,6 +116,14 @@ var allCommands = map[string]commandHandler{
 		}
 		return true
 	}),
+	"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		log.Print(d.BootstrapSelf(ctx))
+		return true
+	}),
+	"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		fmt.Fprint(commandOutputWriter, d.BootstrapRandom(ctx))
+		return true
+	}),
 	"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
 		<-ctx.Done()
 		return true
@@ -126,14 +134,6 @@ var allCommands = map[string]commandHandler{
 	}),
 	"print_self_id": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
 		fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
-		return true
-	}),
-	"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		log.Print(d.BootstrapSelf(ctx))
-		return true
-	}),
-	"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		fmt.Fprint(commandOutputWriter, d.BootstrapRandom(ctx))
 		return true
 	}),
 	"ping": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
