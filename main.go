@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -191,6 +192,14 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 		return false
 	}
 	if handler, ok := allCommands[inputFields[0]]; ok {
+		defer func() {
+			r := recover()
+			if r == nil {
+				return
+			}
+			fmt.Fprintf(commandOutputWriter, "panic handling command: %v\n", r)
+			debug.PrintStack()
+		}()
 		return handler.Do(ctx, d, h, inputFields[1:])
 	}
 	fmt.Fprintf(commandOutputWriter, "unknown command: %q", input)
