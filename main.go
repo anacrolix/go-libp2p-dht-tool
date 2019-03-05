@@ -144,7 +144,7 @@ var allCommands = map[string]commandHandler{
 	"find_providers": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
 		key, err := cid.Decode(args[0])
 		if err != nil {
-			fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[1], err)
+			fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[0], err)
 			return true
 		}
 		count := math.MaxInt32
