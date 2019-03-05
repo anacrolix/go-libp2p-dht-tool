@@ -109,16 +109,16 @@ var allCommands = map[string]commandHandler{
 		//cfg.Timeout = time.Minute
 		err := d.BootstrapOnce(ctx, cfg)
 		if err != nil {
-			log.Printf("error bootstrapping: %v", err)
+			fmt.Fprintf(commandOutputWriter, "%v\n", err)
 		}
 		return true
 	}),
 	"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		log.Print(d.BootstrapSelf(ctx))
+		fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapSelf(ctx))
 		return true
 	}),
 	"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		fmt.Fprint(commandOutputWriter, d.BootstrapRandom(ctx))
+		fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapRandom(ctx))
 		return true
 	}),
 	"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
