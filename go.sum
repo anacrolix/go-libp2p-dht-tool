@@ -137,6 +137,8 @@ github.com/libp2p/go-libp2p-kad-dht v0.0.0-20190303230814-deeac6790c16 h1:qcpuaC
 github.com/libp2p/go-libp2p-kad-dht v0.0.0-20190303230814-deeac6790c16/go.mod h1:p4Ba1RzhVjenWvuh8oq8mBknU4nJKCgl0olQYvdOL0A=
 github.com/libp2p/go-libp2p-kbucket v0.0.1 h1:7H5hM851hkEpLOFjrVNSrrxo6J4bWrUQxxv+z1JW9xk=
 github.com/libp2p/go-libp2p-kbucket v0.0.1/go.mod h1:Y0iQDHRTk/ZgM8PC4jExoF+E4j+yXWwRkdldkMa5Xm4=
+github.com/libp2p/go-libp2p-kbucket v0.1.0 h1:oEla9RDNKkBYVrW5YNtA/Nw643f8NPGmQxI5+6o4x1A=
+github.com/libp2p/go-libp2p-kbucket v0.1.0/go.mod h1:Y0iQDHRTk/ZgM8PC4jExoF+E4j+yXWwRkdldkMa5Xm4=
 github.com/libp2p/go-libp2p-loggables v0.0.1 h1:HVww9oAnINIxbt69LJNkxD8lnbfgteXR97Xm4p3l9ps=
 github.com/libp2p/go-libp2p-loggables v0.0.1/go.mod h1:lDipDlBNYbpyqyPX/KcoO+eq0sJYEVR2JgOexcivchg=
 github.com/libp2p/go-libp2p-metrics v0.0.1 h1:yumdPC/P2VzINdmcKZd0pciSUCpou+s0lwYCjBbzQZU=
