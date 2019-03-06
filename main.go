@@ -137,9 +137,11 @@ var allCommands = map[string]commandHandler{
 		id, err := peer.IDB58Decode(args[0])
 		if err != nil {
 			log.Printf("can't parse peer id: %v", err)
-			return false
+			return true
 		}
-		fmt.Fprintf(commandOutputWriter, "ping result: %v", d.Ping(ctx, id))
+		started := time.Now()
+		err = d.Ping(ctx, id)
+		fmt.Fprintf(commandOutputWriter, "ping result after %v: %v\n", time.Since(started), err)
 		return true
 	}),
 	"find_providers": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
@@ -158,7 +160,7 @@ var allCommands = map[string]commandHandler{
 			count = int(count64)
 		}
 		for pi := range d.FindProvidersAsync(ctx, key, count) {
-			fmt.Fprint(commandOutputWriter, pi)
+			fmt.Fprintln(commandOutputWriter, pi)
 		}
 		return true
 	}),
@@ -246,6 +248,7 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 			if r == nil {
 				return
 			}
+			addHistory = true
 			fmt.Fprintf(commandOutputWriter, "panic handling command: %v\n", r)
 			debug.PrintStack()
 		}()
