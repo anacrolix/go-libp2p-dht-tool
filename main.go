@@ -171,6 +171,28 @@ var allCommands = map[string]commandHandler{
 		}
 		return true
 	}),
+	"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		fmt.Fprintln(commandOutputWriter, "Commands:")
+		for name, usage := range allCommandsUsage {
+			fmt.Fprintf(commandOutputWriter, "\t%s\t%s\n", name, usage)
+		}
+		return true
+	}),
+}
+
+// TODO: fill out usage
+var allCommandsUsage = map[string]string{
+	"add_bootstrap_nodes":     "",
+	"connect_bootstrap_nodes": "",
+	"bootstrap_once":          "",
+	"bootstrap_self":          "",
+	"bootstrap_random":        "",
+	"select_indefinitely":     "",
+	"print_routing_table":     "",
+	"print_self_id":           "",
+	"ping":                    "<peer_id>",
+	"find_providers":          "<key> [num_of_providers]",
+	"set_ipfs_log_level":      "<component> <level>",
 }
 
 const historyPath = ".libp2p-dht-tool-history"
