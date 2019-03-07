@@ -195,7 +195,7 @@ var allCommandsUsage = map[string]string{
 	"set_ipfs_log_level":      "<component> <level>",
 }
 
-const historyPath = ".libp2p-dht-tool-history"
+const historyPath = "~/.libp2p-dht-tool-history"
 
 func readHistory(s *liner.State) (int, error) {
 	f, err := os.Open(historyPath)
