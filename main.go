@@ -201,10 +201,13 @@ func init() {
 	}
 }
 
-const historyPath = "~/.libp2p-dht-tool-history"
+var historyPath = ".libp2p-dht-tool-history"
 
 func readHistory(s *liner.State) (int, error) {
 	f, err := os.Open(historyPath)
+	if os.IsNotExist(err) {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -227,8 +230,14 @@ func writeHistory(s *liner.State) (int, error) {
 
 func interactiveLoop(d *dht.IpfsDHT, h host.Host) error {
 	s := liner.NewLiner()
-	readHistory(s)
-	defer writeHistory(s)
+	if _, err := readHistory(s); err != nil {
+		log.Printf("error reading history: %v", err)
+	}
+	defer func() {
+		if _, err := writeHistory(s); err != nil {
+			log.Printf("error writing history: %v", err)
+		}
+	}()
 	s.SetTabCompletionStyle(liner.TabPrints)
 	s.SetCompleter(func(line string) (ret []string) {
 		for c := range allCommands {
