@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"text/tabwriter"
 	"time"
 
 	"github.com/anacrolix/ipfslog"
@@ -60,13 +61,19 @@ func errMain() error {
 
 type commandHandler interface {
 	Do(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+	ArgHelp() string
 }
 
-type commandFunc func(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+type commandFunc struct {
+	f       func(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+	argHelp string
+}
 
 func (me commandFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
-	return me(ctx, d, h, args)
+	return me.f(ctx, d, h, args)
 }
+
+func (me commandFunc) ArgHelp() string { return me.argHelp }
 
 type nullaryFunc func(context.Context, *dht.IpfsDHT, host.Host) bool
 
@@ -78,121 +85,120 @@ func (me nullaryFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args 
 	return me(ctx, d, h)
 }
 
+func (me nullaryFunc) ArgHelp() string { return "" }
+
 var commandOutputWriter = os.Stdout
 
-var allCommands = map[string]commandHandler{
-	"add_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		for _, bna := range dht.DefaultBootstrapPeers {
-			addr, last := multiaddr.SplitLast(bna)
-			p, err := peer.IDB58Decode(last.Value())
-			if err != nil {
-				log.Printf("can't decode %q: %v", last, err)
-				continue
-			}
-			d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
-			d.RoutingTable().Update(p)
-		}
-		return true
-	}),
-	"connect_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		bootstrapNodeAddrs := dht.DefaultBootstrapPeers
-		numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
-		if numConnected == 0 {
-			log.Print("failed to connect to any bootstrap nodes")
-		} else {
-			log.Printf("connected to %d/%d bootstrap nodes", numConnected, len(bootstrapNodeAddrs))
-		}
-		return true
-	}),
-	"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		cfg := dht.DefaultBootstrapConfig
-		//cfg.Timeout = time.Minute
-		err := d.BootstrapOnce(ctx, cfg)
-		if err != nil {
-			fmt.Fprintf(commandOutputWriter, "%v\n", err)
-		}
-		return true
-	}),
-	"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapSelf(ctx))
-		return true
-	}),
-	"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapRandom(ctx))
-		return true
-	}),
-	"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		<-ctx.Done()
-		return true
-	}),
-	"print_routing_table": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		doPrintRoutingTable(os.Stdout, d)
-		return true
-	}),
-	"print_self_id": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
-		return true
-	}),
-	"ping": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
-		id, err := peer.IDB58Decode(args[0])
-		if err != nil {
-			log.Printf("can't parse peer id: %v", err)
-			return true
-		}
-		started := time.Now()
-		err = d.Ping(ctx, id)
-		fmt.Fprintf(commandOutputWriter, "ping result after %v: %v\n", time.Since(started), err)
-		return true
-	}),
-	"find_providers": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
-		key, err := cid.Decode(args[0])
-		if err != nil {
-			fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[0], err)
-			return true
-		}
-		count := math.MaxInt32
-		if len(args) >= 2 {
-			count64, err := strconv.ParseInt(args[1], 0, 0)
-			if err != nil {
-				fmt.Fprintf(commandOutputWriter, "error parsing count: %v\n", err)
-				return true
-			}
-			count = int(count64)
-		}
-		for pi := range d.FindProvidersAsync(ctx, key, count) {
-			fmt.Fprintln(commandOutputWriter, pi)
-		}
-		return true
-	}),
-	"set_ipfs_log_level": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
-		err := ipfs_go_log.SetLogLevel(args[0], args[1])
-		if err != nil {
-			fmt.Fprintln(commandOutputWriter, err)
-		}
-		return true
-	}),
-	"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
-		fmt.Fprintln(commandOutputWriter, "Commands:")
-		for name, usage := range allCommandsUsage {
-			fmt.Fprintf(commandOutputWriter, "\t%s\t%s\n", name, usage)
-		}
-		return true
-	}),
-}
+var allCommands map[string]commandHandler
 
-// TODO: fill out usage
-var allCommandsUsage = map[string]string{
-	"add_bootstrap_nodes":     "",
-	"connect_bootstrap_nodes": "",
-	"bootstrap_once":          "",
-	"bootstrap_self":          "",
-	"bootstrap_random":        "",
-	"select_indefinitely":     "",
-	"print_routing_table":     "",
-	"print_self_id":           "",
-	"ping":                    "<peer_id>",
-	"find_providers":          "<key> [num_of_providers]",
-	"set_ipfs_log_level":      "<component> <level>",
+func init() {
+	allCommands = map[string]commandHandler{
+		"add_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			for _, bna := range dht.DefaultBootstrapPeers {
+				addr, last := multiaddr.SplitLast(bna)
+				p, err := peer.IDB58Decode(last.Value())
+				if err != nil {
+					log.Printf("can't decode %q: %v", last, err)
+					continue
+				}
+				d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
+				d.RoutingTable().Update(p)
+			}
+			return true
+		}),
+		"connect_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			bootstrapNodeAddrs := dht.DefaultBootstrapPeers
+			numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
+			if numConnected == 0 {
+				log.Print("failed to connect to any bootstrap nodes")
+			} else {
+				log.Printf("connected to %d/%d bootstrap nodes", numConnected, len(bootstrapNodeAddrs))
+			}
+			return true
+		}),
+		"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			cfg := dht.DefaultBootstrapConfig
+			//cfg.Timeout = time.Minute
+			err := d.BootstrapOnce(ctx, cfg)
+			if err != nil {
+				fmt.Fprintf(commandOutputWriter, "%v\n", err)
+			}
+			return true
+		}),
+		"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapSelf(ctx))
+			return true
+		}),
+		"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapRandom(ctx))
+			return true
+		}),
+		"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			<-ctx.Done()
+			return true
+		}),
+		"print_routing_table": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			doPrintRoutingTable(os.Stdout, d)
+			return true
+		}),
+		"print_self_id": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
+			return true
+		}),
+		"ping": commandFunc{
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+				id, err := peer.IDB58Decode(args[0])
+				if err != nil {
+					log.Printf("can't parse peer id: %v", err)
+					return true
+				}
+				started := time.Now()
+				err = d.Ping(ctx, id)
+				fmt.Fprintf(commandOutputWriter, "ping result after %v: %v\n", time.Since(started), err)
+				return true
+			},
+			"<peer_id>"},
+		"find_providers": commandFunc{
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+				key, err := cid.Decode(args[0])
+				if err != nil {
+					fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[0], err)
+					return true
+				}
+				count := math.MaxInt32
+				if len(args) >= 2 {
+					count64, err := strconv.ParseInt(args[1], 0, 0)
+					if err != nil {
+						fmt.Fprintf(commandOutputWriter, "error parsing count: %v\n", err)
+						return true
+					}
+					count = int(count64)
+				}
+				for pi := range d.FindProvidersAsync(ctx, key, count) {
+					fmt.Fprintln(commandOutputWriter, pi)
+				}
+				return true
+			},
+			"<key> [num_of_providers]"},
+		"set_ipfs_log_level": commandFunc{
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+				err := ipfs_go_log.SetLogLevel(args[0], args[1])
+				if err != nil {
+					fmt.Fprintln(commandOutputWriter, err)
+				}
+				return true
+			},
+			"<component> <level>"},
+		"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+			fmt.Fprintln(commandOutputWriter, "Commands:")
+			tw := tabwriter.NewWriter(commandOutputWriter, 0, 0, 2, ' ', 0)
+			for name, v := range allCommands {
+				fmt.Fprintf(tw, "\t%s\t%s\n", name, v.ArgHelp())
+			}
+			tw.Flush()
+			return true
+		}),
+	}
 }
 
 const historyPath = "~/.libp2p-dht-tool-history"
