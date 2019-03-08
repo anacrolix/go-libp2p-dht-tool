@@ -65,24 +65,24 @@ type commandHandler interface {
 }
 
 type commandFunc struct {
-	f       func(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+	f       func(context.Context, *dht.IpfsDHT, host.Host, []string)
 	argHelp string
 }
 
-func (me commandFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
-	return me.f(ctx, d, h, args)
+func (me commandFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
+	me.f(ctx, d, h, args)
 }
 
 func (me commandFunc) ArgHelp() string { return me.argHelp }
 
-type nullaryFunc func(context.Context, *dht.IpfsDHT, host.Host) bool
+type nullaryFunc func(context.Context, *dht.IpfsDHT, host.Host)
 
-func (me nullaryFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+func (me nullaryFunc) Do(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 	if len(args) > 0 {
 		log.Print("command does not take arguments")
-		return false
+		return
 	}
-	return me(ctx, d, h)
+	me(ctx, d, h)
 }
 
 func (me nullaryFunc) ArgHelp() string { return "" }
@@ -93,7 +93,7 @@ var allCommands map[string]commandHandler
 
 func init() {
 	allCommands = map[string]commandHandler{
-		"add_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"add_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			for _, bna := range dht.DefaultBootstrapPeers {
 				addr, last := multiaddr.SplitLast(bna)
 				p, err := peer.IDB58Decode(last.Value())
@@ -104,9 +104,8 @@ func init() {
 				d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
 				d.RoutingTable().Update(p)
 			}
-			return true
 		}),
-		"connect_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"connect_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			bootstrapNodeAddrs := dht.DefaultBootstrapPeers
 			numConnected := connectToBootstrapNodes(ctx, h, bootstrapNodeAddrs)
 			if numConnected == 0 {
@@ -114,89 +113,78 @@ func init() {
 			} else {
 				log.Printf("connected to %d/%d bootstrap nodes", numConnected, len(bootstrapNodeAddrs))
 			}
-			return true
 		}),
-		"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			cfg := dht.DefaultBootstrapConfig
 			//cfg.Timeout = time.Minute
 			err := d.BootstrapOnce(ctx, cfg)
 			if err != nil {
 				fmt.Fprintf(commandOutputWriter, "%v\n", err)
 			}
-			return true
 		}),
-		"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapSelf(ctx))
-			return true
 		}),
-		"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapRandom(ctx))
-			return true
 		}),
-		"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			<-ctx.Done()
-			return true
 		}),
-		"print_routing_table": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"print_routing_table": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			doPrintRoutingTable(os.Stdout, d)
-			return true
 		}),
-		"print_self_id": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"print_self_id": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			fmt.Printf("%s (%x)\n", d.PeerID().Pretty(), d.PeerKey())
-			return true
 		}),
 		"ping": commandFunc{
-			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 				id, err := peer.IDB58Decode(args[0])
 				if err != nil {
 					log.Printf("can't parse peer id: %v", err)
-					return true
+					return
 				}
 				started := time.Now()
 				err = d.Ping(ctx, id)
 				fmt.Fprintf(commandOutputWriter, "ping result after %v: %v\n", time.Since(started), err)
-				return true
 			},
 			"<peer_id>"},
 		"find_providers": commandFunc{
-			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 				key, err := cid.Decode(args[0])
 				if err != nil {
 					fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[0], err)
-					return true
+					return
 				}
 				count := math.MaxInt32
 				if len(args) >= 2 {
 					count64, err := strconv.ParseInt(args[1], 0, 0)
 					if err != nil {
 						fmt.Fprintf(commandOutputWriter, "error parsing count: %v\n", err)
-						return true
+						return
 					}
 					count = int(count64)
 				}
 				for pi := range d.FindProvidersAsync(ctx, key, count) {
 					fmt.Fprintln(commandOutputWriter, pi)
 				}
-				return true
 			},
 			"<key> [num_of_providers]"},
 		"set_ipfs_log_level": commandFunc{
-			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 				err := ipfs_go_log.SetLogLevel(args[0], args[1])
 				if err != nil {
 					fmt.Fprintln(commandOutputWriter, err)
 				}
-				return true
 			},
 			"<component> <level>"},
-		"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) bool {
+		"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			fmt.Fprintln(commandOutputWriter, "Commands:")
 			tw := tabwriter.NewWriter(commandOutputWriter, 0, 0, 2, ' ', 0)
 			for name, v := range allCommands {
 				fmt.Fprintf(tw, "\t%s\t%s\n", name, v.ArgHelp())
 			}
 			tw.Flush()
-			return true
 		}),
 	}
 }
