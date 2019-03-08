@@ -144,6 +144,23 @@ var allCommands = map[string]commandHandler{
 		fmt.Fprintf(commandOutputWriter, "ping result after %v: %v\n", time.Since(started), err)
 		return true
 	}),
+	"find_peer": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
+		pid, err := peer.IDB58Decode(args[0])
+		if err != nil {
+			fmt.Fprintf(commandOutputWriter, "error decoding peer id: %v\n", err)
+			return true
+		}
+		pi, err := d.FindPeer(ctx, pid)
+		if err != nil {
+			fmt.Fprintf(commandOutputWriter, "error finding peer: %v\n", err)
+			return true
+		}
+		fmt.Fprintf(commandOutputWriter, "peer %v has addresses:\n")
+		for _, a := range pi.Addrs {
+			fmt.Fprintln(commandOutputWriter, a)
+		}
+		return true
+	}),
 	"find_providers": commandFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) bool {
 		key, err := cid.Decode(args[0])
 		if err != nil {
