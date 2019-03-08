@@ -60,7 +60,7 @@ func errMain() error {
 }
 
 type commandHandler interface {
-	Do(context.Context, *dht.IpfsDHT, host.Host, []string) bool
+	Do(context.Context, *dht.IpfsDHT, host.Host, []string)
 	ArgHelp() string
 }
 
@@ -277,7 +277,8 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 			fmt.Fprintf(commandOutputWriter, "panic handling command: %v\n", r)
 			debug.PrintStack()
 		}()
-		return handler.Do(ctx, d, h, inputFields[1:])
+		handler.Do(ctx, d, h, inputFields[1:])
+		return
 	}
 	fmt.Fprintf(commandOutputWriter, "unknown command: %q", input)
 	return false
