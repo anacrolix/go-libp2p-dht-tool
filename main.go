@@ -148,7 +148,27 @@ func init() {
 				err = d.Ping(ctx, id)
 				fmt.Fprintf(commandOutputWriter, "ping result after %v: %v\n", time.Since(started), err)
 			},
-			"<peer_id>"},
+			"<peer_id>",
+		},
+		"find_peer": commandFunc{
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
+				pid, err := peer.IDB58Decode(args[0])
+				if err != nil {
+					fmt.Fprintf(commandOutputWriter, "error decoding peer id: %v\n", err)
+					return
+				}
+				pi, err := d.FindPeer(ctx, pid)
+				if err != nil {
+					fmt.Fprintf(commandOutputWriter, "error finding peer: %v\n", err)
+					return
+				}
+				fmt.Fprintf(commandOutputWriter, "%q has addresses:\n", pid)
+				for _, a := range pi.Addrs {
+					fmt.Fprintln(commandOutputWriter, a)
+				}
+			},
+			"<peer_id>",
+		},
 		"find_providers": commandFunc{
 			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 				key, err := cid.Decode(args[0])
@@ -169,7 +189,8 @@ func init() {
 					fmt.Fprintln(commandOutputWriter, pi)
 				}
 			},
-			"<key> [num_of_providers]"},
+			"<key> [num_of_providers]",
+		},
 		"set_ipfs_log_level": commandFunc{
 			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 				err := ipfs_go_log.SetLogLevel(args[0], args[1])
