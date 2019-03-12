@@ -374,20 +374,18 @@ func setupMetrics() error {
 
 	// libp2p dht metrics
 	if err := view.Register(
-		dht.GetValueMsgReceivedCountView,
-		dht.PutValueMsgReceivedCountView,
-		dht.FindNodeMsgReceivedCountView,
-		dht.AddProviderMsgReceivedCountView,
-		dht.GetProvidersMsgReceivedCountView,
-		dht.PingMsgReceivedCountView,
+		dht.ReceivedMessagesPerRPCView,
+		dht.ReceivedBytesPerRPCView,
+		dht.LatencyPerRPCView,
 	); err != nil {
 		return err
 	}
 
+	endpoint := os.Getenv("PROM_ENDPOINT")
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", pe)
-		if err := http.ListenAndServe("0.0.0.0:8888", mux); err != nil {
+		if err := http.ListenAndServe(endpoint, mux); err != nil {
 			log.Fatalf("Failed to run Prometheus /metrics endpoint: %v", err)
 		}
 	}()
