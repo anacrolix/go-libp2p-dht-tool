@@ -6,9 +6,11 @@ import (
 	"io"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +31,9 @@ import (
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/peterh/liner"
+	prom "github.com/prometheus/client_golang/prometheus"
+	"go.opencensus.io/exporter/prometheus"
+	"go.opencensus.io/stats/view"
 )
 
 func main() {
@@ -39,6 +44,10 @@ func main() {
 }
 
 func errMain() error {
+	err := setupMetrics()
+	if err != nil {
+		return err
+	}
 	ipfslog.SetAllLoggerLevels(ipfslog.Warning)
 	ipfslog.SetModuleLevel("dht", ipfslog.Info)
 	log.SetFlags(log.Flags() | log.Llongfile)
@@ -202,8 +211,13 @@ func init() {
 		"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			fmt.Fprintln(commandOutputWriter, "Commands:")
 			tw := tabwriter.NewWriter(commandOutputWriter, 0, 0, 2, ' ', 0)
-			for name, v := range allCommands {
-				fmt.Fprintf(tw, "\t%s\t%s\n", name, v.ArgHelp())
+			var keys []string
+			for k := range allCommands {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				fmt.Fprintf(tw, "\t%s\t%s\n", k, allCommands[k].ArgHelp())
 			}
 			tw.Flush()
 		}),
@@ -339,4 +353,43 @@ func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.M
 	}
 	wg.Wait()
 	return
+}
+
+func setupMetrics() error {
+	registry := prom.NewRegistry()
+	goCollector := prom.NewGoCollector()
+	procCollector := prom.NewProcessCollector(prom.ProcessCollectorOpts{})
+	registry.MustRegister(goCollector, procCollector)
+	pe, err := prometheus.NewExporter(prometheus.Options{
+		Namespace: "dht_tool",
+		Registry:  registry,
+	})
+	if err != nil {
+		return err
+	}
+
+	// register prometheus with opencensus
+	view.RegisterExporter(pe)
+	view.SetReportingPeriod(2 * time.Second)
+
+	// libp2p dht metrics
+	if err := view.Register(
+		dht.GetValueMsgReceivedCountView,
+		dht.PutValueMsgReceivedCountView,
+		dht.FindNodeMsgReceivedCountView,
+		dht.AddProviderMsgReceivedCountView,
+		dht.GetProvidersMsgReceivedCountView,
+		dht.PingMsgReceivedCountView,
+	); err != nil {
+		return err
+	}
+
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", pe)
+		if err := http.ListenAndServe("0.0.0.0:8888", mux); err != nil {
+			log.Fatalf("Failed to run Prometheus /metrics endpoint: %v", err)
+		}
+	}()
+	return nil
 }
