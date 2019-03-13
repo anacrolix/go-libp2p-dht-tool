@@ -44,10 +44,6 @@ func main() {
 }
 
 func errMain() error {
-	err := setupMetrics()
-	if err != nil {
-		return err
-	}
 	ipfslog.SetAllLoggerLevels(ipfslog.Warning)
 	ipfslog.SetModuleLevel("dht", ipfslog.Info)
 	log.SetFlags(log.Flags() | log.Llongfile)
@@ -65,6 +61,9 @@ func errMain() error {
 		return fmt.Errorf("error creating dht node: %s", err)
 	}
 	defer d.Close()
+	if err := setupMetrics(d); err != nil {
+		return err
+	}
 	return interactiveLoop(d, host)
 }
 
@@ -355,7 +354,7 @@ func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.M
 	return
 }
 
-func setupMetrics() error {
+func setupMetrics(d *dht.IpfsDHT) error {
 	registry := prom.NewRegistry()
 	goCollector := prom.NewGoCollector()
 	procCollector := prom.NewProcessCollector(prom.ProcessCollectorOpts{})
@@ -373,11 +372,7 @@ func setupMetrics() error {
 	view.SetReportingPeriod(2 * time.Second)
 
 	// libp2p dht metrics
-	if err := view.Register(
-		dht.ReceivedMessagesPerRPCView,
-		dht.ReceivedBytesPerRPCView,
-		dht.LatencyPerRPCView,
-	); err != nil {
+	if err := view.Register(d.GetMetrics().AllViews()...); err != nil {
 		return err
 	}
 
