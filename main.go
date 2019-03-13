@@ -25,6 +25,7 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	host "github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/metrics"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	peer "github.com/libp2p/go-libp2p-peer"
@@ -372,7 +373,7 @@ func setupMetrics(d *dht.IpfsDHT) error {
 	view.SetReportingPeriod(2 * time.Second)
 
 	// libp2p dht metrics
-	if err := view.Register(d.GetMetrics().AllViews()...); err != nil {
+	if err := view.Register(metrics.AllViews()...); err != nil {
 		return err
 	}
 
