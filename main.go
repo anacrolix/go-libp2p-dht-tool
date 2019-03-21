@@ -301,7 +301,7 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 		handler.Do(ctx, d, h, inputFields[1:])
 		return true
 	}
-	fmt.Fprintf(commandOutputWriter, "unknown command: %q", input)
+	fmt.Fprintf(commandOutputWriter, "unknown command: %q\n", input)
 	return false
 }
 
