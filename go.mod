@@ -12,7 +12,7 @@ require (
 	github.com/libp2p/go-libp2p-host v0.0.1
 	github.com/libp2p/go-libp2p-kad-dht v0.0.0-20190303230814-deeac6790c16
 	github.com/libp2p/go-libp2p-kbucket v0.1.0
-	github.com/libp2p/go-libp2p-peer v0.0.1
+	github.com/libp2p/go-libp2p-peer v0.1.0
 	github.com/libp2p/go-libp2p-peerstore v0.0.1
 	github.com/multiformats/go-multiaddr v0.0.1
 	github.com/peterh/liner v1.1.0
