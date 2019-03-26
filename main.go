@@ -374,7 +374,7 @@ func setupMetrics(d *dht.IpfsDHT) error {
 	view.SetReportingPeriod(2 * time.Second)
 
 	// libp2p dht metrics
-	if err := view.Register(metrics.AllViews()...); err != nil {
+	if err := view.Register(metrics.Views...); err != nil {
 		return err
 	}
 

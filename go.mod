@@ -11,7 +11,7 @@ require (
 	github.com/ipfs/go-log v0.0.1
 	github.com/libp2p/go-libp2p v0.0.2
 	github.com/libp2p/go-libp2p-host v0.0.2
-	github.com/libp2p/go-libp2p-kad-dht v0.0.5-0.20190312234906-0cd08e00d7b7
+	github.com/libp2p/go-libp2p-kad-dht v0.0.5-0.20190326030340-2d699f34f70b
 	github.com/libp2p/go-libp2p-kbucket v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.1.0
 	github.com/libp2p/go-libp2p-peerstore v0.0.1
