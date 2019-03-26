@@ -16,6 +16,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	_ "github.com/anacrolix/envpprof"
 	"github.com/anacrolix/ipfslog"
 	"github.com/anacrolix/tagflag"
 	cid "github.com/ipfs/go-cid"

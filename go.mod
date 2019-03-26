@@ -1,6 +1,7 @@
 module github.com/anacrolix/go-libp2p-dht-tool
 
 require (
+	github.com/anacrolix/envpprof v1.0.0
 	github.com/anacrolix/ipfslog v0.0.1
 	github.com/anacrolix/missinggo v0.2.0 // indirect
 	github.com/anacrolix/tagflag v0.0.0-20180803105420-3a8ff5428f76
