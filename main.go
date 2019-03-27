@@ -6,9 +6,11 @@ import (
 	"io"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,19 +18,21 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	_ "github.com/anacrolix/envpprof"
 	"github.com/anacrolix/ipfslog"
 	"github.com/anacrolix/tagflag"
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 	ipfs_go_log "github.com/ipfs/go-log"
-	libp2p "github.com/libp2p/go-libp2p"
-	host "github.com/libp2p/go-libp2p-host"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-kad-dht/opts"
+	"github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p-peer"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/peterh/liner"
 )
 
@@ -57,6 +61,9 @@ func errMain() error {
 		return fmt.Errorf("error creating dht node: %s", err)
 	}
 	defer d.Close()
+	if err := setupMetrics(d); err != nil {
+		return err
+	}
 	return interactiveLoop(d, host)
 }
 
@@ -203,8 +210,13 @@ func init() {
 		"help": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			fmt.Fprintln(commandOutputWriter, "Commands:")
 			tw := tabwriter.NewWriter(commandOutputWriter, 0, 0, 2, ' ', 0)
-			for name, v := range allCommands {
-				fmt.Fprintf(tw, "\t%s\t%s\n", name, v.ArgHelp())
+			var keys []string
+			for k := range allCommands {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				fmt.Fprintf(tw, "\t%s\t%s\n", k, allCommands[k].ArgHelp())
 			}
 			tw.Flush()
 		}),
@@ -340,4 +352,13 @@ func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.M
 	}
 	wg.Wait()
 	return
+}
+
+func setupMetrics(d *dht.IpfsDHT) error {
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		panic(http.ListenAndServe(os.Getenv("PROM_ENDPOINT"), mux))
+	}()
+	return nil
 }
