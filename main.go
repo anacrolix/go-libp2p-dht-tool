@@ -18,24 +18,22 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	_ "github.com/anacrolix/envpprof"
 	"github.com/anacrolix/ipfslog"
 	"github.com/anacrolix/tagflag"
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 	ipfs_go_log "github.com/ipfs/go-log"
-	libp2p "github.com/libp2p/go-libp2p"
-	host "github.com/libp2p/go-libp2p-host"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-kad-dht/metrics"
-	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-kad-dht/opts"
+	"github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p-peer"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/peterh/liner"
-	prom "github.com/prometheus/client_golang/prometheus"
-	"go.opencensus.io/exporter/prometheus"
-	"go.opencensus.io/stats/view"
 )
 
 func main() {
@@ -357,34 +355,10 @@ func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.M
 }
 
 func setupMetrics(d *dht.IpfsDHT) error {
-	registry := prom.NewRegistry()
-	goCollector := prom.NewGoCollector()
-	procCollector := prom.NewProcessCollector(prom.ProcessCollectorOpts{})
-	registry.MustRegister(goCollector, procCollector)
-	pe, err := prometheus.NewExporter(prometheus.Options{
-		Namespace: "dht_tool",
-		Registry:  registry,
-	})
-	if err != nil {
-		return err
-	}
-
-	// register prometheus with opencensus
-	view.RegisterExporter(pe)
-	view.SetReportingPeriod(2 * time.Second)
-
-	// libp2p dht metrics
-	if err := view.Register(metrics.Views...); err != nil {
-		return err
-	}
-
-	endpoint := os.Getenv("PROM_ENDPOINT")
 	go func() {
 		mux := http.NewServeMux()
-		mux.Handle("/metrics", pe)
-		if err := http.ListenAndServe(endpoint, mux); err != nil {
-			log.Fatalf("Failed to run Prometheus /metrics endpoint: %v", err)
-		}
+		mux.Handle("/metrics", promhttp.Handler())
+		panic(http.ListenAndServe(os.Getenv("PROM_ENDPOINT"), mux))
 	}()
 	return nil
 }

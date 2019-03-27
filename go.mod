@@ -17,6 +17,5 @@ require (
 	github.com/libp2p/go-libp2p-peerstore v0.0.1
 	github.com/multiformats/go-multiaddr v0.0.1
 	github.com/peterh/liner v1.1.0
-	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829
-	go.opencensus.io v0.19.1
+	github.com/prometheus/client_golang v0.9.3-0.20190325082328-7490f0a74525
 )
