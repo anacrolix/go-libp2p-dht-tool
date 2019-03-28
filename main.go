@@ -34,7 +34,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/peterh/liner"
 	prom "github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opencensus.io/exporter/prometheus"
 	"go.opencensus.io/stats/view"
 )
@@ -381,7 +380,7 @@ func setupMetrics(d *dht.IpfsDHT) error {
 
 	go func() {
 		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.Handler())
+		mux.Handle("/metrics", pe)
 		panic(http.ListenAndServe(os.Getenv("PROM_ENDPOINT"), mux))
 	}()
 	return nil
