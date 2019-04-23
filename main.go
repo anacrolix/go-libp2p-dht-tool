@@ -24,7 +24,7 @@ import (
 	"github.com/anacrolix/ipfslog"
 	"github.com/anacrolix/tagflag"
 	"github.com/ipfs/go-cid"
-	ipfs_go_log "github.com/ipfs/go-log"
+	ipfsGoLog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -220,7 +220,7 @@ func init() {
 		},
 		"set_ipfs_log_level": commandFunc{
 			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
-				err := ipfs_go_log.SetLogLevel(args[0], args[1])
+				err := ipfsGoLog.SetLogLevel(args[0], args[1])
 				if err != nil {
 					fmt.Fprintln(commandOutputWriter, err)
 				}
