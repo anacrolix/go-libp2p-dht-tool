@@ -177,6 +177,25 @@ func init() {
 			},
 			"<peer_id>",
 		},
+		"provide": commandFunc{
+			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
+				key, err := cid.Decode(args[0])
+				if err != nil {
+					fmt.Fprintf(commandOutputWriter, "error decoding %q: %v\n", args[0], err)
+					return
+				}
+				broadcast := true
+				if len(args) >= 2 {
+					var err error
+					broadcast, err = strconv.ParseBool(args[1])
+					if err != nil {
+						fmt.Fprintf(commandOutputWriter, "error parsing bool from %q: %v\n", args[1], err)
+						return
+					}
+				}
+				d.Provide(ctx, key, broadcast)
+			}, "<key>",
+		},
 		"find_providers": commandFunc{
 			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
 				key, err := cid.Decode(args[0])
