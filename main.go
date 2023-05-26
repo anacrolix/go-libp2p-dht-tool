@@ -3,10 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
+	_ "github.com/anacrolix/envpprof"
+	"github.com/anacrolix/tagflag"
+	"github.com/ipfs/go-cid"
+	ipfsGoLog "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/peterh/liner"
 	"io"
 	"log"
 	"math"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -17,23 +27,6 @@ import (
 	"sync/atomic"
 	"text/tabwriter"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	_ "github.com/anacrolix/envpprof"
-	"github.com/anacrolix/ipfslog"
-	"github.com/anacrolix/tagflag"
-	"github.com/ipfs/go-cid"
-	ipfsGoLog "github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-kad-dht/opts"
-	"github.com/libp2p/go-libp2p-kbucket"
-	"github.com/libp2p/go-libp2p-peer"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/peterh/liner"
 )
 
 func main() {
@@ -44,26 +37,21 @@ func main() {
 }
 
 func errMain() error {
-	ipfslog.SetAllLoggerLevels(ipfslog.Warning)
-	ipfslog.SetModuleLevel("dht", ipfslog.Info)
 	log.SetFlags(log.Flags() | log.Llongfile)
 	var cmd struct {
 		Passive bool `help:"start DHT node in client-only mode"`
 	}
 	tagflag.Parse(&cmd)
-	host, err := libp2p.New(context.Background())
+	host, err := libp2p.New()
 	if err != nil {
 		return fmt.Errorf("error creating host: %s", err)
 	}
 	defer host.Close()
-	d, err := dht.New(context.Background(), host, dhtopts.Client(cmd.Passive))
+	d, err := dht.New(context.Background(), host, dht.Mode(dht.ModeServer))
 	if err != nil {
 		return fmt.Errorf("error creating dht node: %s", err)
 	}
 	defer d.Close()
-	if err := setupMetrics(d); err != nil {
-		return err
-	}
 	return interactiveLoop(d, host)
 }
 
@@ -104,13 +92,13 @@ func init() {
 		"add_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			for _, bna := range dht.DefaultBootstrapPeers {
 				addr, last := multiaddr.SplitLast(bna)
-				p, err := peer.IDB58Decode(last.Value())
+				p, err := peer.Decode(last.Value())
 				if err != nil {
 					log.Printf("can't decode %q: %v", last, err)
 					continue
 				}
 				d.Host().Peerstore().AddAddrs(p, []multiaddr.Multiaddr{addr}, time.Hour)
-				d.RoutingTable().Update(p)
+				d.RoutingTable().UpdateLastSuccessfulOutboundQueryAt(p, time.Now().Add(1*time.Hour))
 			}
 		}),
 		"connect_bootstrap_nodes": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
@@ -122,19 +110,19 @@ func init() {
 				log.Printf("connected to %d/%d bootstrap nodes", numConnected, len(bootstrapNodeAddrs))
 			}
 		}),
-		"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
-			cfg := dht.DefaultBootstrapConfig
-			//cfg.Timeout = time.Minute
-			err := d.BootstrapOnce(ctx, cfg)
-			if err != nil {
-				fmt.Fprintf(commandOutputWriter, "%v\n", err)
-			}
-		}),
+		//"bootstrap_once": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
+		//	cfg := dht.DefaultBootstrapConfig
+		//	//cfg.Timeout = time.Minute
+		//	err := d.BootstrapOnce(ctx, cfg)
+		//	if err != nil {
+		//		fmt.Fprintf(commandOutputWriter, "%v\n", err)
+		//	}
+		//}),
 		"bootstrap_self": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
-			fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapSelf(ctx))
+			fmt.Fprintf(commandOutputWriter, "%v\n", d.Bootstrap(ctx))
 		}),
 		"bootstrap_random": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
-			fmt.Fprintf(commandOutputWriter, "%v\n", d.BootstrapRandom(ctx))
+			fmt.Fprintf(commandOutputWriter, "%v\n", d.Bootstrap(ctx))
 		}),
 		"select_indefinitely": nullaryFunc(func(ctx context.Context, d *dht.IpfsDHT, h host.Host) {
 			<-ctx.Done()
@@ -147,7 +135,7 @@ func init() {
 		}),
 		"ping": commandFunc{
 			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
-				id, err := peer.IDB58Decode(args[0])
+				id, err := peer.Decode(args[0])
 				if err != nil {
 					log.Printf("can't parse peer id: %v", err)
 					return
@@ -160,7 +148,7 @@ func init() {
 		},
 		"find_peer": commandFunc{
 			func(ctx context.Context, d *dht.IpfsDHT, h host.Host, args []string) {
-				pid, err := peer.IDB58Decode(args[0])
+				pid, err := peer.Decode(args[0])
 				if err != nil {
 					fmt.Fprintf(commandOutputWriter, "error decoding peer id: %v\n", err)
 					return
@@ -338,16 +326,16 @@ func handleInput(input string, d *dht.IpfsDHT, h host.Host) (addHistory bool) {
 }
 
 func doPrintRoutingTable(w io.Writer, d *dht.IpfsDHT) {
-	for i, b := range d.RoutingTable().Buckets {
-		for _, p := range b.Peers() {
-			fmt.Fprintf(w, "%3d %3d %x %v %v\n",
-				i,
-				kbucket.CommonPrefixLen(kbucket.ConvertPeerID(p), kbucket.ConvertPeerID(d.PeerID())),
-				kbucket.ConvertPeerID(p),
-				p.Pretty(),
-				d.Host().Network().Connectedness(p),
-			)
-		}
+	for i, p := range d.RoutingTable().ListPeers() {
+
+		fmt.Fprintf(w, "%3d %3d %x %v %v\n",
+			i,
+			kbucket.CommonPrefixLen(kbucket.ConvertPeerID(p), kbucket.ConvertPeerID(d.PeerID())),
+			kbucket.ConvertPeerID(p),
+			p.String(),
+			d.Host().Network().Connectedness(p),
+		)
+
 	}
 }
 
@@ -356,7 +344,7 @@ func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.M
 	for _, ma := range mas {
 		wg.Add(1)
 		go func(ma multiaddr.Multiaddr) {
-			pi, err := pstore.InfoFromP2pAddr(ma)
+			pi, err := peer.AddrInfoFromP2pAddr(ma)
 			if err != nil {
 				panic(err)
 			}
@@ -373,11 +361,11 @@ func connectToBootstrapNodes(ctx context.Context, h host.Host, mas []multiaddr.M
 	return
 }
 
-func setupMetrics(d *dht.IpfsDHT) error {
-	go func() {
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.Handler())
-		panic(http.ListenAndServe(os.Getenv("PROM_ENDPOINT"), mux))
-	}()
-	return nil
-}
+//func setupMetrics(d *dht.IpfsDHT) error {
+//	go func() {
+//		mux := http.NewServeMux()
+//		mux.Handle("/metrics", promhttp.Handler())
+//		panic(http.ListenAndServe(os.Getenv("PROM_ENDPOINT"), mux))
+//	}()
+//	return nil
+//}
